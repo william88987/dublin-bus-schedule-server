@@ -1,0 +1,27 @@
+{
+  "name": "gtfs-proxy-server",
+  "version": "1.0.0",
+  "description": "Dublin Bus GTFS-Realtime Proxy Server for ESP32 Display Devices",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "keywords": [
+    "gtfs",
+    "gtfs-rt",
+    "dublin-bus",
+    "esp32",
+    "proxy"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "adm-zip": "^0.5.12",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.2.0",
+    "gtfs-realtime-bindings": "^1.1.1"
+  }
+}

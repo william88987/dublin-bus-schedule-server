@@ -242,27 +242,6 @@ function generateMockPredictions(stopId, now) {
   return predictions;
 }
 
-/**
- * Starts background polling of NTA real-time feed.
- */
-export function startRealtimePolling() {
-  if (config.mockMode) {
-    console.log('ℹ️ Running in MOCK MODE. Real-time background fetch polling is disabled.');
-    lastFetchTime = new Date();
-    return;
-  }
-
-  if (pollIntervalId) {
-    clearInterval(pollIntervalId);
-  }
-
-  // Fetch immediately on start
-  fetchRealtimeUpdates();
-
-  // Schedule periodic fetches
-  pollIntervalId = setInterval(fetchRealtimeUpdates, config.rtFetchIntervalSec * 1000);
-  console.log(`⏱️ Scheduled real-time polling every ${config.rtFetchIntervalSec}s.`);
-}
 
 /**
  * Returns formatted predictions for a specific stop ID (Option A grouped).

@@ -95,9 +95,13 @@ function parseScheduledTime(startDateStr, timeStr) {
     return Math.floor(utcDate.getTime() / 1000);
   }
 }
+// Exponential backoff state
+let consecutiveFailures = 0;
+const MAX_BACKOFF_SEC = 300; // Cap at 5 minutes
 
 /**
  * Fetches real-time TripUpdates from NTA and updates the in-memory cache.
+ * Returns true on success, false on failure.
  */
 async function fetchRealtimeUpdates() {
   console.log('🔄 Fetching real-time updates from NTA GTFS-R feed...');
@@ -109,6 +113,14 @@ async function fetchRealtimeUpdates() {
         'x-api-key': config.ntaApiKey
       }
     });
+
+    if (response.status === 429) {
+      consecutiveFailures++;
+      const backoffSec = Math.min(config.rtFetchIntervalSec * Math.pow(2, consecutiveFailures - 1), MAX_BACKOFF_SEC);
+      console.warn(`⚠️ NTA API rate limit hit (429). Backing off for ${backoffSec}s (attempt #${consecutiveFailures}).`);
+      scheduleNextFetch(backoffSec * 1000);
+      return;
+    }
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
@@ -136,12 +148,48 @@ async function fetchRealtimeUpdates() {
     // Swap cache atomically
     tripUpdatesCache = tempCache;
     lastFetchTime = new Date();
+    consecutiveFailures = 0; // Reset on success
     
     console.log(`✅ Cached real-time updates in ${Date.now() - startTime}ms.`);
     console.log(`   - Total trip updates cached: ${tripUpdateCount}`);
+    scheduleNextFetch(config.rtFetchIntervalSec * 1000);
   } catch (error) {
-    console.error('❌ Failed to fetch GTFS-RT updates:', error);
+    consecutiveFailures++;
+    const backoffSec = Math.min(config.rtFetchIntervalSec * Math.pow(2, consecutiveFailures - 1), MAX_BACKOFF_SEC);
+    console.error(`❌ Failed to fetch GTFS-RT updates (attempt #${consecutiveFailures}, next retry in ${backoffSec}s):`, error.message);
+    scheduleNextFetch(backoffSec * 1000);
   }
+}
+
+/**
+ * Schedules the next fetch after a given delay, replacing any existing schedule.
+ */
+function scheduleNextFetch(delayMs) {
+  if (pollIntervalId) {
+    clearTimeout(pollIntervalId);
+  }
+  pollIntervalId = setTimeout(fetchRealtimeUpdates, delayMs);
+}
+
+/**
+ * Starts background polling of NTA real-time feed.
+ */
+export function startRealtimePolling() {
+  if (config.mockMode) {
+    console.log('ℹ️ Running in MOCK MODE. Real-time background fetch polling is disabled.');
+    lastFetchTime = new Date();
+    return;
+  }
+
+  if (pollIntervalId) {
+    clearTimeout(pollIntervalId);
+  }
+
+  consecutiveFailures = 0;
+
+  // Fetch immediately on start, then schedule next via backoff
+  fetchRealtimeUpdates();
+  console.log(`⏱️ Real-time polling started (base interval: ${config.rtFetchIntervalSec}s, max backoff: ${MAX_BACKOFF_SEC}s).`);
 }
 
 /**
@@ -333,7 +381,7 @@ export function getPredictionsForStop(stopId) {
  */
 export function stopRealtimePolling() {
   if (pollIntervalId) {
-    clearInterval(pollIntervalId);
+    clearTimeout(pollIntervalId);
     pollIntervalId = null;
   }
 }

@@ -1,6 +1,7 @@
 import GtfsRealtimeBindings from 'gtfs-realtime-bindings';
 import config from './config.js';
 import { getRouteShortName, getTripInfo, getStopName, resolveStopId, getScheduledTripsForStop, getActiveServiceIds } from './gtfs-static.js';
+import { logError } from './logger.js';
 
 // In-memory real-time cache
 // Maps trip_id -> TripUpdate object
@@ -91,7 +92,7 @@ function parseScheduledTime(startDateStr, timeStr) {
     const targetUtc = Date.UTC(targetYear, targetMonth, targetDay, targetHour, targetMinute, targetSecond) - offsetMs;
     return Math.floor(targetUtc / 1000);
   } catch (err) {
-    console.error('❌ Failed to parse timezone offset, falling back to UTC:', err);
+    logError(err, 'Failed to parse timezone offset, falling back to UTC');
     return Math.floor(utcDate.getTime() / 1000);
   }
 }
@@ -156,7 +157,7 @@ async function fetchRealtimeUpdates() {
   } catch (error) {
     consecutiveFailures++;
     const backoffSec = Math.min(config.rtFetchIntervalSec * Math.pow(2, consecutiveFailures - 1), MAX_BACKOFF_SEC);
-    console.error(`❌ Failed to fetch GTFS-RT updates (attempt #${consecutiveFailures}, next retry in ${backoffSec}s):`, error.message);
+    logError(error, `Failed to fetch GTFS-RT updates (attempt #${consecutiveFailures}, next retry in ${backoffSec}s)`);
     scheduleNextFetch(backoffSec * 1000);
   }
 }

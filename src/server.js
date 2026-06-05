@@ -4,6 +4,8 @@ import limiter from './rate-limiter.js';
 import { loadStaticGtfs, isStaticGtfsReady, getStopName, resolveStopId } from './gtfs-static.js';
 import { startRealtimePolling, getPredictionsForStop, getRealtimeStatus } from './gtfs-realtime.js';
 
+import { requestLogger, logError } from './logger.js';
+
 const app = express();
 
 // Trust reverse proxy headers (crucial for accurate IP rate limiting in cloud environments like Heroku, Render, AWS ALB, Nginx)
@@ -12,12 +14,8 @@ app.set('trust proxy', true);
 // Standard JSON body parser
 app.use(express.json());
 
-// Request logging middleware
-app.use((req, res, next) => {
-  const ip = req.ip || req.socket.remoteAddress;
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} - IP: ${ip}`);
-  next();
-});
+// Request logging middleware (logs to console & logs/access.log)
+app.use(requestLogger);
 
 /**
  * Health and status endpoint
@@ -79,7 +77,7 @@ app.get('/bus', limiter, (req, res) => {
       schedules: schedules
     });
   } catch (error) {
-    console.error(`❌ Error handling predictions for stop ${cleanStopId}:`, error);
+    logError(error, `predictions for stop ${cleanStopId}`);
     res.status(500).json({
       status: 500,
       error: 'Internal Server Error',
@@ -112,7 +110,7 @@ app.post('/refresh-static', async (req, res) => {
         }
       })
       .catch(err => {
-        console.error('❌ Background static GTFS reload failed:', err);
+        logError(err, 'Background static GTFS reload');
       });
 
     res.json({
@@ -139,7 +137,7 @@ app.use((req, res) => {
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error('❌ Unhandled Exception:', err);
+  logError(err, 'Unhandled Exception');
   res.status(500).json({
     status: 500,
     error: 'Internal Server Error',
@@ -167,7 +165,7 @@ async function bootstrap() {
           startRealtimePolling();
         }
       } catch (err) {
-        console.error('❌ Scheduled static GTFS refresh failed:', err);
+        logError(err, 'Scheduled static GTFS refresh');
       }
     }, config.staticRefreshIntervalHours * 60 * 60 * 1000);
     
@@ -180,7 +178,7 @@ async function bootstrap() {
       }
     });
   } catch (error) {
-    console.error('❌ Critical startup failure:', error);
+    logError(error, 'Critical startup failure');
     process.exit(1);
   }
 }

@@ -5,6 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { execSync } from 'child_process';
 import readline from 'readline';
 import config from './config.js';
+import { logError } from './logger.js';
 
 // In-memory GTFS Static caches
 let routesMap = new Map(); // route_id -> route_short_name (bus number)
@@ -82,7 +83,7 @@ async function ensureStaticGtfsFile() {
       console.log(`✅ Downloaded static GTFS ZIP in ${((Date.now() - startTime) / 1000).toFixed(1)}s (${(buffer.byteLength / 1024 / 1024).toFixed(1)} MB)`);
       return true; // New download occurred
     } catch (error) {
-      console.error('❌ Failed to download static GTFS. Will attempt to use existing file if available.', error);
+      logError(error, 'Failed to download static GTFS. Will attempt to use existing file if available.');
       if (!fs.existsSync(zipPath)) {
         throw new Error('No static GTFS zip file found, and download failed.');
       }
@@ -116,7 +117,7 @@ async function rebuildSqliteDb() {
   try {
     execSync(`unzip -p "${zipPath}" stop_times.txt > "${txtPath}"`);
   } catch (err) {
-    console.error('❌ Failed to extract stop_times.txt from ZIP. Attempting JS fallback...', err);
+    logError(err, 'Failed to extract stop_times.txt from ZIP. Attempting JS fallback...');
     // JS Fallback (might use more RAM)
     const zip = new AdmZip(zipPath);
     const entry = zip.getEntry('stop_times.txt');
@@ -341,7 +342,7 @@ export async function loadStaticGtfs() {
     const mem = process.memoryUsage();
     console.log(`   - RAM Heap Used: ${(mem.heapUsed / 1024 / 1024).toFixed(1)} MB / Max Limit: ${(mem.heapTotal / 1024 / 1024).toFixed(1)} MB`);
   } catch (error) {
-    console.error('❌ Error loading static GTFS:', error);
+    logError(error, 'Error loading static GTFS');
     throw error;
   } finally {
     isLoading = false;
@@ -397,7 +398,7 @@ export function getScheduledArrivalTime(tripId, stopId) {
     const row = queryStmt.get(stopId, tripId);
     return row ? row.arrival_time : null;
   } catch (err) {
-    console.error(`❌ SQLite scheduled time lookup failed (Trip: ${tripId}, Stop: ${stopId}):`, err);
+    logError(err, `SQLite scheduled time lookup failed (Trip: ${tripId}, Stop: ${stopId})`);
     return null;
   }
 }
@@ -456,7 +457,7 @@ export function getScheduledTripsForStop(stopId, afterTimeStr) {
   try {
     return queryTripsStmt.all(stopId, afterTimeStr);
   } catch (err) {
-    console.error(`❌ SQLite scheduled trips lookup failed (Stop: ${stopId}, Time: ${afterTimeStr}):`, err);
+    logError(err, `SQLite scheduled trips lookup failed (Stop: ${stopId}, Time: ${afterTimeStr})`);
     return [];
   }
 }

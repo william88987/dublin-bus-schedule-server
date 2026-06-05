@@ -5,3 +5,4 @@ inspect-feed.js
 inspect-arrival.js
 time-check.js
 .DS_Store
+logs/

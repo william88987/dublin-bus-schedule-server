@@ -14,7 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const config = {
-  port: parseInt(process.env.PORT, 10) || 3000,
+  port: parseInt(process.env.PORT, 10) || 3006,
   ntaApiKey: process.env.NTA_API_KEY || '',
   rtFetchIntervalSec: parseInt(process.env.RT_FETCH_INTERVAL_SEC, 10) || 30,
   staticGtfsZipUrl: process.env.STATIC_GTFS_ZIP_URL || 'https://www.transportforireland.ie/transitData/Data/GTFS_Realtime.zip',

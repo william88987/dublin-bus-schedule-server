@@ -96,7 +96,7 @@ Returns health metadata about the server, cache freshness, and memory consumptio
 Copy `.env.example` to `.env` and configure your settings:
 
 ```ini
-PORT=3000
+PORT=3006
 NTA_API_KEY=your_nta_api_key
 MOCK_MODE=false
 RT_FETCH_INTERVAL_SEC=30
@@ -124,7 +124,7 @@ RATE_LIMIT_MAX_REQUESTS=60
 
 3. **Verify the server**:
    ```bash
-   curl -i "http://localhost:3000/bus?stop=7347"
+   curl -i "http://localhost:3006/bus?stop=7347"
    ```
 
 ---

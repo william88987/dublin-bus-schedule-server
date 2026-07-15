@@ -16,6 +16,9 @@ let calendarData = []; // list of calendar entries
 let calendarDatesData = []; // list of calendar exceptions
 let isLoaded = false;
 let isLoading = false;
+let lastDownloadError = null;
+let staticFileAgeHours = null;
+
 
 // SQLite Database resources
 let dbInstance = null;
@@ -60,6 +63,7 @@ async function ensureStaticGtfsFile() {
   if (fs.existsSync(zipPath)) {
     const stats = fs.statSync(zipPath);
     const ageInHours = (Date.now() - stats.mtimeMs) / (1000 * 60 * 60);
+    staticFileAgeHours = ageInHours;
     console.log(`ℹ️ Static GTFS file exists. Age: ${ageInHours.toFixed(1)} hours.`);
     
     if (ageInHours < config.staticRefreshIntervalHours) {
@@ -74,15 +78,23 @@ async function ensureStaticGtfsFile() {
     console.log(`📥 Downloading static GTFS from ${config.staticGtfsZipUrl}...`);
     const startTime = Date.now();
     try {
-      const response = await fetch(config.staticGtfsZipUrl);
+      const response = await fetch(config.staticGtfsZipUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+        }
+      });
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const buffer = await response.arrayBuffer();
       fs.writeFileSync(zipPath, Buffer.from(buffer));
       console.log(`✅ Downloaded static GTFS ZIP in ${((Date.now() - startTime) / 1000).toFixed(1)}s (${(buffer.byteLength / 1024 / 1024).toFixed(1)} MB)`);
+      lastDownloadError = null;
+      const stats = fs.statSync(zipPath);
+      staticFileAgeHours = (Date.now() - stats.mtimeMs) / (1000 * 60 * 60);
       return true; // New download occurred
     } catch (error) {
+      lastDownloadError = error.message;
       logError(error, 'Failed to download static GTFS. Will attempt to use existing file if available.');
       if (!fs.existsSync(zipPath)) {
         throw new Error('No static GTFS zip file found, and download failed.');
@@ -429,6 +441,28 @@ export function getStopName(stopId) {
  */
 export function resolveStopId(stopCodeOrId) {
   return stopCodeToIdMap.get(stopCodeOrId) || stopCodeOrId;
+}
+
+/**
+ * Returns metadata about the static GTFS state.
+ */
+export function getStaticGtfsMetadata() {
+  const zipPath = path.join(config.dataDir, 'GTFS_Realtime.zip');
+  let mtime = null;
+  let size = null;
+  if (fs.existsSync(zipPath)) {
+    const stats = fs.statSync(zipPath);
+    mtime = stats.mtimeMs ? new Date(stats.mtimeMs).toISOString() : null;
+    size = `${(stats.size / 1024 / 1024).toFixed(2)} MB`;
+  }
+  return {
+    ready: isLoaded,
+    loading: isLoading,
+    fileModifiedTime: mtime,
+    fileSizeBytes: size,
+    ageHours: staticFileAgeHours !== null ? parseFloat(staticFileAgeHours.toFixed(2)) : null,
+    lastDownloadError: lastDownloadError
+  };
 }
 
 /**

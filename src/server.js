@@ -1,7 +1,7 @@
 import express from 'express';
 import config from './config.js';
 import limiter from './rate-limiter.js';
-import { loadStaticGtfs, isStaticGtfsReady, getStopName, resolveStopId } from './gtfs-static.js';
+import { loadStaticGtfs, isStaticGtfsReady, getStopName, resolveStopId, getStaticGtfsMetadata } from './gtfs-static.js';
 import { startRealtimePolling, getPredictionsForStop, getRealtimeStatus } from './gtfs-realtime.js';
 
 import { requestLogger, logError } from './logger.js';
@@ -25,7 +25,7 @@ app.get('/status', (req, res) => {
   
   res.json({
     status: 'online',
-    staticGtfsReady: isStaticGtfsReady(),
+    staticGtfs: getStaticGtfsMetadata(),
     mockMode: rtStatus.mockMode,
     lastRealtimeFetch: rtStatus.lastFetchTime,
     cachedStopsCount: rtStatus.cacheSize,

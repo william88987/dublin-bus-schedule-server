@@ -117,8 +117,14 @@ async function rebuildSqliteDb() {
 
   // Close active connection if any
   if (dbInstance) {
+    try {
+      dbInstance.close();
+    } catch (e) {
+      // ignore
+    }
     dbInstance = null;
     queryStmt = null;
+    queryTripsStmt = null;
   }
 
   if (fs.existsSync(dbPath)) {
@@ -329,6 +335,18 @@ export async function loadStaticGtfs() {
       await rebuildSqliteDb();
     } else {
       console.log('ℹ️ SQLite database is present and fresh. Skipping rebuild.');
+    }
+
+    // Close old connection if open
+    if (dbInstance) {
+      try {
+        dbInstance.close();
+      } catch (e) {
+        // ignore
+      }
+      dbInstance = null;
+      queryStmt = null;
+      queryTripsStmt = null;
     }
 
     // Initialize Database lookup statement

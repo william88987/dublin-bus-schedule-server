@@ -218,26 +218,17 @@ function generateMockPredictions(stopId, now) {
   const predictions = [];
 
   for (const r of routes) {
-    const minSincePeriodStart1 = (currentMinute - r.offset + 60) % r.interval;
-    const minsToArrive1 = r.interval - minSincePeriodStart1;
-    const arrivalTime1 = now + (minsToArrive1 * 60) - currentSecond;
-    
-    const minsToArrive2 = minsToArrive1 + r.interval;
-    const arrivalTime2 = now + (minsToArrive2 * 60) - currentSecond;
-
-    predictions.push({
-      route: r.route,
-      destination: r.destination,
-      arrivalTime: arrivalTime1,
-      live: true
-    });
-
-    predictions.push({
-      route: r.route,
-      destination: r.destination,
-      arrivalTime: arrivalTime2,
-      live: true
-    });
+    for (let i = 0; i < 6; i++) {
+      const minSincePeriodStart = (currentMinute - r.offset + 60) % r.interval;
+      const minsToArrive = r.interval - minSincePeriodStart + (i * r.interval);
+      const arrivalTime = now + (minsToArrive * 60) - currentSecond;
+      predictions.push({
+        route: r.route,
+        destination: r.destination,
+        arrivalTime: arrivalTime,
+        live: true
+      });
+    }
   }
 
   return predictions;
@@ -247,7 +238,7 @@ function generateMockPredictions(stopId, now) {
 /**
  * Returns formatted predictions for a specific stop ID (Option A grouped).
  */
-export function getPredictionsForStop(stopId) {
+export function getPredictionsForStop(stopId, maxArrivals = 10) {
   const nowSec = Math.floor(Date.now() / 1000);
   
   // Resolve the stop code/ID first
@@ -355,28 +346,68 @@ export function getPredictionsForStop(stopId) {
   // 3. Sort by arrival time ascending
   filtered.sort((a, b) => a.arrivalTime - b.arrivalTime);
 
-  // 4. Group by route number and destination to separate directions
-  const groups = new Map(); // route_destination -> { route, destination, arrivals: [] }
-  
+  // 4. Hybrid Fair-Fill Allocation across available display budget (maxArrivals)
+  // Step A: Index departures by route-destination preserving chronological order
+  const routeDepartures = new Map();
   for (const p of filtered) {
     const key = `${p.route}_${p.destination}`;
-    if (!groups.has(key)) {
-      groups.set(key, {
+    if (!routeDepartures.has(key)) {
+      routeDepartures.set(key, {
         route: p.route,
         destination: p.destination,
-        arrivals: []
+        departures: []
       });
     }
+    routeDepartures.get(key).departures.push(p);
+  }
 
-    const group = groups.get(key);
-    // Limit to next 2 arrivals
-    if (group.arrivals.length < 2) {
-      const minsToArrive = Math.max(0, Math.round((p.arrivalTime - nowSec) / 60));
-      group.arrivals.push(minsToArrive);
+  // Step B: Pass 1 - Fair share guarantee (earliest arrival for each route)
+  const selectedPerGroup = new Map();
+  const selectedSet = new Set();
+  let totalSelected = 0;
+
+  for (const [key, group] of routeDepartures.entries()) {
+    if (totalSelected >= maxArrivals) break;
+    if (group.departures.length > 0) {
+      const earliest = group.departures[0];
+      selectedPerGroup.set(key, [earliest]);
+      selectedSet.add(earliest);
+      totalSelected++;
     }
   }
 
-  return Array.from(groups.values());
+  // Step C: Pass 2 - Fill remaining budget chronologically across all routes
+  if (totalSelected < maxArrivals) {
+    for (const p of filtered) {
+      if (totalSelected >= maxArrivals) break;
+      if (!selectedSet.has(p)) {
+        const key = `${p.route}_${p.destination}`;
+        if (!selectedPerGroup.has(key)) {
+          selectedPerGroup.set(key, []);
+        }
+        selectedPerGroup.get(key).push(p);
+        selectedSet.add(p);
+        totalSelected++;
+      }
+    }
+  }
+
+  // Step D: Format output into schedules list, sorting arrivals ascending within each route
+  const results = [];
+  for (const [key, group] of routeDepartures.entries()) {
+    const allocated = selectedPerGroup.get(key);
+    if (allocated && allocated.length > 0) {
+      allocated.sort((a, b) => a.arrivalTime - b.arrivalTime);
+      const arrivals = allocated.map(p => Math.max(0, Math.round((p.arrivalTime - nowSec) / 60)));
+      results.push({
+        route: group.route,
+        destination: group.destination,
+        arrivals
+      });
+    }
+  }
+
+  return results;
 }
 
 /**

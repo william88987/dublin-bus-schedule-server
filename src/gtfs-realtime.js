@@ -307,10 +307,13 @@ export function getPredictionsForStop(stopId) {
             continue;
           }
 
-          if (exact.arrival?.time) {
-            arrivalTime = parseInt(exact.arrival.time, 10);
-          } else if (exact.departure?.time) {
-            arrivalTime = parseInt(exact.departure.time, 10);
+          const exactArrTime = exact.arrival?.time ? Number(exact.arrival.time) : 0;
+          const exactDepTime = exact.departure?.time ? Number(exact.departure.time) : 0;
+
+          if (exactArrTime > 1000000000) {
+            arrivalTime = exactArrTime;
+          } else if (exactDepTime > 1000000000) {
+            arrivalTime = exactDepTime;
           } else if (exact.arrival?.delay !== undefined) {
             delay = exact.arrival.delay;
             arrivalTime = scheduledTimeSec + delay;

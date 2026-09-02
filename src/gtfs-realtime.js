@@ -313,10 +313,21 @@ export function getPredictionsForStop(stopId, maxArrivals = 8) {
             arrivalTime = scheduledTimeSec + delay;
           }
         } else {
-          // Propagate delay: find any stop update in the trip that has a delay, and propagate it
-          const anyUpdate = updates.find(u => u.arrival?.delay !== undefined || u.departure?.delay !== undefined);
-          if (anyUpdate) {
-            delay = anyUpdate.arrival?.delay !== undefined ? anyUpdate.arrival.delay : anyUpdate.departure.delay;
+          // Propagate the latest reported delay on this trip (search backwards for the most recent stop update)
+          let propagatedDelay = null;
+          for (let i = updates.length - 1; i >= 0; i--) {
+            const u = updates[i];
+            if (u.arrival?.delay !== undefined) {
+              propagatedDelay = u.arrival.delay;
+              break;
+            }
+            if (u.departure?.delay !== undefined) {
+              propagatedDelay = u.departure.delay;
+              break;
+            }
+          }
+          if (propagatedDelay !== null) {
+            delay = propagatedDelay;
             arrivalTime = scheduledTimeSec + delay;
           }
         }
@@ -367,6 +378,10 @@ export function stopRealtimePolling() {
     clearTimeout(pollIntervalId);
     pollIntervalId = null;
   }
+}
+
+export function getTripUpdate(tripId) {
+  return tripUpdatesCache.get(tripId);
 }
 
 /**

@@ -2,7 +2,7 @@ import express from 'express';
 import config from './config.js';
 import limiter from './rate-limiter.js';
 import { loadStaticGtfs, isStaticGtfsReady, getStopName, resolveStopId, getStaticGtfsMetadata } from './gtfs-static.js';
-import { startRealtimePolling, getPredictionsForStop, getRealtimeStatus } from './gtfs-realtime.js';
+import { startRealtimePolling, getPredictionsForStop, getRealtimeStatus, getTripUpdate } from './gtfs-realtime.js';
 
 import { requestLogger, logError } from './logger.js';
 
@@ -128,6 +128,13 @@ app.post('/refresh-static', async (req, res) => {
       message: error.message
     });
   }
+});
+
+app.get('/debug-trip', (req, res) => {
+  const tid = req.query.id;
+  if (!tid) return res.status(400).json({ error: 'Missing ?id=trip_id' });
+  const tu = getTripUpdate(tid);
+  res.json({ tripId: tid, cached: !!tu, tripUpdate: tu });
 });
 
 // Fallback 404 handler

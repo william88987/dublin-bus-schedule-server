@@ -283,10 +283,17 @@ export function getPredictionsForStop(stopId) {
 
       let delay = 0;
       let live = false;
+      let arrivalTime = scheduledTimeSec;
 
       // Check if we have a live update for this trip in the cache
       const liveUpdate = tripUpdatesCache.get(s.trip_id);
       if (liveUpdate) {
+        // Skip trip if marked as CANCELED (enum 3 or string 'CANCELED')
+        const tripRel = liveUpdate.trip?.scheduleRelationship;
+        if (tripRel === 3 || tripRel === 'CANCELED') {
+          continue;
+        }
+
         live = true;
         
         // Find delay for this stop
@@ -294,19 +301,32 @@ export function getPredictionsForStop(stopId) {
         const exact = updates.find(u => u.stopId === officialStopId);
         
         if (exact) {
-          delay = exact.arrival?.delay !== undefined 
-            ? exact.arrival.delay 
-            : (exact.departure?.delay !== undefined ? exact.departure.delay : 0);
+          // Skip if this specific stop is skipped (enum 1 or string 'SKIPPED')
+          const stopRel = exact.scheduleRelationship;
+          if (stopRel === 1 || stopRel === 'SKIPPED') {
+            continue;
+          }
+
+          if (exact.arrival?.time) {
+            arrivalTime = parseInt(exact.arrival.time, 10);
+          } else if (exact.departure?.time) {
+            arrivalTime = parseInt(exact.departure.time, 10);
+          } else if (exact.arrival?.delay !== undefined) {
+            delay = exact.arrival.delay;
+            arrivalTime = scheduledTimeSec + delay;
+          } else if (exact.departure?.delay !== undefined) {
+            delay = exact.departure.delay;
+            arrivalTime = scheduledTimeSec + delay;
+          }
         } else {
           // Propagate delay: find any stop update in the trip that has a delay, and propagate it
           const anyUpdate = updates.find(u => u.arrival?.delay !== undefined || u.departure?.delay !== undefined);
           if (anyUpdate) {
             delay = anyUpdate.arrival?.delay !== undefined ? anyUpdate.arrival.delay : anyUpdate.departure.delay;
+            arrivalTime = scheduledTimeSec + delay;
           }
         }
       }
-
-      const arrivalTime = scheduledTimeSec + delay;
       
       let routeShortName = getRouteShortName(tripInfo.routeId);
       const destination = tripInfo.headsign || 'Scheduled Route';
@@ -376,3 +396,5 @@ export function getRealtimeStatus() {
     cacheSize: tripUpdatesCache.size
   };
 }
+
+

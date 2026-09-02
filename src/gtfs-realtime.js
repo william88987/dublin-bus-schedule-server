@@ -235,6 +235,13 @@ function generateMockPredictions(stopId, now) {
 }
 
 
+function getEventDelay(event) {
+  if (event && Object.prototype.hasOwnProperty.call(event, 'delay') && typeof event.delay === 'number') {
+    return event.delay;
+  }
+  return null;
+}
+
 /**
  * Returns formatted predictions for a specific stop ID (Option A grouped).
  */
@@ -305,24 +312,21 @@ export function getPredictionsForStop(stopId, maxArrivals = 8) {
             arrivalTime = exactArrTime;
           } else if (exactDepTime > 1000000000) {
             arrivalTime = exactDepTime;
-          } else if (exact.arrival?.delay !== undefined) {
-            delay = exact.arrival.delay;
-            arrivalTime = scheduledTimeSec + delay;
-          } else if (exact.departure?.delay !== undefined) {
-            delay = exact.departure.delay;
-            arrivalTime = scheduledTimeSec + delay;
+          } else {
+            const exactDelay = getEventDelay(exact.arrival) ?? getEventDelay(exact.departure);
+            if (exactDelay !== null) {
+              delay = exactDelay;
+              arrivalTime = scheduledTimeSec + delay;
+            }
           }
         } else {
           // Propagate the latest reported delay on this trip (search backwards for the most recent stop update)
           let propagatedDelay = null;
           for (let i = updates.length - 1; i >= 0; i--) {
             const u = updates[i];
-            if (u.arrival?.delay !== undefined) {
-              propagatedDelay = u.arrival.delay;
-              break;
-            }
-            if (u.departure?.delay !== undefined) {
-              propagatedDelay = u.departure.delay;
+            const d = getEventDelay(u.departure) ?? getEventDelay(u.arrival);
+            if (d !== null) {
+              propagatedDelay = d;
               break;
             }
           }

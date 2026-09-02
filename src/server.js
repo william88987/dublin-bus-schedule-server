@@ -65,9 +65,9 @@ app.get('/bus', limiter, (req, res) => {
   const officialStopId = resolveStopId(cleanStopId);
   const stopName = getStopName(officialStopId);
 
-  // Optional total arrival entries limit (defaults to 10 for display)
+  // Optional total arrival entries limit (defaults to 8 for display)
   const limitParam = parseInt(req.query.limit, 10);
-  const maxArrivals = !isNaN(limitParam) && limitParam > 0 ? limitParam : 10;
+  const maxArrivals = !isNaN(limitParam) && limitParam > 0 ? limitParam : 8;
 
   try {
     // 3. Retrieve predictions with Hybrid Fair-Fill

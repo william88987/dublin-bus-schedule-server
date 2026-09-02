@@ -238,7 +238,7 @@ function generateMockPredictions(stopId, now) {
 /**
  * Returns formatted predictions for a specific stop ID (Option A grouped).
  */
-export function getPredictionsForStop(stopId, maxArrivals = 10) {
+export function getPredictionsForStop(stopId, maxArrivals = 8) {
   const nowSec = Math.floor(Date.now() / 1000);
   
   // Resolve the stop code/ID first

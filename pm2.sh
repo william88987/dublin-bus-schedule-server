@@ -39,15 +39,43 @@ case "$1" in
         echo "🖥️ Starting PM2 monitor..."
         pm2 monit
         ;;
+    test-static)
+        echo "🧹 Clearing existing GTFS cache to force re-download..."
+        rm -f data/GTFS_Realtime.zip data/gtfs.db
+        echo "📥 Running static GTFS download & unzip test directly..."
+        node -e "import('./src/gtfs-static.js').then(m => m.loadStaticGtfs())"
+        ;;
+    refresh-data)
+        echo "🧹 Clearing existing GTFS cache..."
+        rm -f data/GTFS_Realtime.zip data/gtfs.db
+        echo "🔄 Restarting $APP_NAME in PM2..."
+        pm2 restart "$APP_NAME"
+        echo "📋 Streaming logs (Ctrl+C to exit):"
+        pm2 logs "$APP_NAME" --lines 30
+        ;;
+    health)
+        echo "🩺 Fetching server & static data status:"
+        if command -v jq &> /dev/null; then
+            curl -s http://localhost:3006/status | jq .
+        elif command -v json_pp &> /dev/null; then
+            curl -s http://localhost:3006/status | json_pp
+        else
+            curl -s http://localhost:3006/status
+            echo ""
+        fi
+        ;;
     *)
-        echo "Usage: $0 {start|stop|restart|status|logs|delete|monit}"
-        echo "  start   - Add and start the app in PM2"
-        echo "  stop    - Stop the running app"
-        echo "  restart - Restart the app"
-        echo "  status  - Show status and details"
-        echo "  logs    - View real-time logs"
-        echo "  delete  - Delete the app from PM2 registry"
-        echo "  monit   - Launch PM2 terminal dashboard"
+        echo "Usage: $0 {start|stop|restart|status|logs|delete|monit|test-static|refresh-data|health}"
+        echo "  start        - Add and start the app in PM2"
+        echo "  stop         - Stop the running app"
+        echo "  restart      - Restart the app"
+        echo "  status       - Show status and details"
+        echo "  logs         - View real-time logs"
+        echo "  delete       - Delete the app from PM2 registry"
+        echo "  monit        - Launch PM2 terminal dashboard"
+        echo "  test-static  - Clear cache and test download/unzip in the terminal"
+        echo "  refresh-data - Clear cache, restart PM2, and tail startup logs"
+        echo "  health       - Check /status endpoint (shows GTFS download status)"
         exit 1
         ;;
 esac
